@@ -5,65 +5,12 @@ const { validateSignUpData } = require("./utils/validator");
 const bcrypt = require("bcrypt");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
+const { userAuth } = require("./middlewares/auth");
 
 const app = express();
 
 app.use(express.json());
 app.use(cookieParser());
-
-app.post("/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    const user = await User.findOne({ email: email });
-
-    if (!user) {
-      throw new Error("Invalid Credentials!");
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (isPasswordValid) {
-      const token = jwt.sign({ _id: user._id }, "DEV@Tinder#1997");
-
-      console.log(token);
-
-      res.cookie("token", token);
-
-      res.send("Login Successful  !!!");
-    } else {
-      throw new Error("Invalid Credentials  !!!");
-    }
-  } catch (err) {
-    res.status(400).send("Error :" + err.message);
-  }
-});
-
-app.get("/profile", async (req, res) => {
-  try {
-    const cookies = req.cookies;
-
-    const { token } = cookies;
-
-    if (!token) {
-      throw new Error("Invalid Token !");
-    }
-
-    const deecodedMessage = jwt.verify(token, "DEV@Tinder#1997");
-
-    const { _id } = deecodedMessage;
-
-    const user = await User.findById(_id);
-
-    if (!user) {
-      throw new Error("User not exist !");
-    }
-
-    res.send(user);
-  } catch {
-    res.status(400).send("Error :" + err.message);
-  }
-});
 
 app.post("/signup", async (req, res) => {
   try {
@@ -133,6 +80,48 @@ app.patch("/user", async (req, res) => {
   } catch (err) {
     res.status(400).send("Something went wrong:" + err.message);
   }
+});
+
+app.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email: email });
+
+    if (!user) {
+      throw new Error("Invalid Credentials!");
+    }
+
+    const isPasswordValid = await user.validatePassword(password);
+
+    if (isPasswordValid) {
+      const token = await user.getJWT();
+
+      res.cookie("token", token, {
+        expires: new Date(Date.now() + 8 * 3600000),
+      });
+
+      res.send("Login Successful  !!!");
+    } else {
+      throw new Error("Invalid Credentials  !!!");
+    }
+  } catch (err) {
+    res.status(400).send("Error :" + err.message);
+  }
+});
+
+app.get("/profile", userAuth, async (req, res) => {
+  try {
+    const user = req.user;
+    res.send(user);
+  } catch {
+    res.status(400).send("Error :" + err.message);
+  }
+});
+
+app.post("/sendConnectionRequest", userAuth, (req, res) => {
+  const user = req.user;
+
+  res.send(user.firstName + "sent the connectoion request !");
 });
 
 connectDB()

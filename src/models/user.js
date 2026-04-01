@@ -1,4 +1,7 @@
 const mongoose = require("mongoose");
+const validator = require("validator");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 
 const userSchema = new mongoose.Schema(
   {
@@ -17,10 +20,16 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       unique: true,
       trim: true,
+      validate(value) {
+        if (!validator.isEmail(value)) {
+          throw new Error("Invalid Email address: " + value);
+        }
+      },
     },
     password: {
       type: String,
       required: true,
+      minLength: 6,
     },
     age: {
       type: Number,
@@ -50,6 +59,25 @@ const userSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-const user = mongoose.model("User", userSchema);
+userSchema.methods.getJWT = async function () {
+  const user = this;
 
-module.exports = user;
+  const token = await jwt.sign({ _id: user._id }, "DEV@Tinder#1997", {
+    expiresIn: "1d",
+  });
+
+  return token;
+};
+
+userSchema.methods.validatePassword = async function (passwordInputByUser) {
+  const user = this;
+  const passwordHash = user.password;
+  const isPasswordValid = await bcrypt.compare(
+    passwordInputByUser,
+    passwordHash,
+  );
+
+  return isPasswordValid;
+};
+
+module.exports = mongoose.model("User", userSchema);
