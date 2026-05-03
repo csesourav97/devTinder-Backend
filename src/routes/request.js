@@ -11,7 +11,7 @@ requestRouter.post(
   userAuth,
   async (req, res) => {
     try {
-      const formUserId = req.user._id;
+      const fromUserId = req.user._id;
       const toUserId = req.params.toUserId;
       const status = req.params.status;
 
@@ -33,8 +33,8 @@ requestRouter.post(
       // If connection request already exixt
       const existingConnectionRequest = await ConnectionRequest.findOne({
         $or: [
-          { formUserId, toUserId },
-          { formUserId: toUserId, toUserId: formUserId },
+          { fromUserId, toUserId },
+          { fromUserId: toUserId, toUserId: fromUserId },
         ],
       });
 
@@ -45,7 +45,7 @@ requestRouter.post(
       }
 
       const connectionRequest = new ConnectionRequest({
-        formUserId,
+        fromUserId,
         toUserId,
         status,
       });
@@ -59,6 +59,40 @@ requestRouter.post(
       });
     } catch (err) {
       res.status(400).send("ERROR :" + err.message);
+    }
+  },
+);
+
+requestRouter.post(
+  "/request/review/:status/:requestId",
+  userAuth,
+  async (req, res) => {
+    try {
+      const loggedInUser = req.user;
+      const { status, requestId } = req.params;
+
+      const allowedStatus = ["accepted", "rejected"];
+
+      if (!allowedStatus.includes(status)) {
+        (res.status(400), json({ message: "Status not allowed !!" }));
+      }
+
+      const connectionRequest = await ConnectionRequest.findOne({
+        _id: requestId,
+        toUserId: loggedInUser._id,
+        status: "interested",
+      });
+
+      if (!connectionRequest) {
+        res.status(400).json({ message: "Connection Request not Found !!" });
+      }
+
+      connectionRequest.status = status;
+      const data = await connectionRequest.save();
+
+      res.json({ message: "Connection Request " + status, data });
+    } catch (err) {
+      res.status(400).send("ERROR: " + err.message);
     }
   },
 );
