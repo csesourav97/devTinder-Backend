@@ -43,16 +43,26 @@ const userSchema = new mongoose.Schema(
     },
     gender: {
       type: String,
-      validate(value) {
-        if (!["male", "female", "others"].includes(value)) {
-          throw new Error("Gender data is not valid !");
-        }
+      enum: {
+        values: ["male", "female", "others"],
+        message: `{VALUE} is not a valid gender type`,
       },
+
+      // validate(value) {
+      //   if (!["male", "female", "others"].includes(value)) {
+      //     throw new Error("Gender data is not valid !");
+      //   }
+      // },
     },
     photoUrl: {
       type: String,
       default:
         "https://media.istockphoto.com/id/1459664492/sv/vektor/default-avatar-profile-user-profile-icon-profile-picture-portrait-symbol-user-member-people.jpg?s=170667a&w=0&k=20&c=57_LnlTQWdZhouMUxsxHGVVKMJYA4IjyK9VrF9r_JUg=",
+      validate(value) {
+        if (!validator.isURL(value)) {
+          throw new Error("Invalid photo URL: " + value);
+        }
+      },
     },
     about: {
       type: String,
@@ -78,6 +88,7 @@ userSchema.methods.getJWT = async function () {
 userSchema.methods.validatePassword = async function (passwordInputByUser) {
   const user = this;
   const passwordHash = user.password;
+
   const isPasswordValid = await bcrypt.compare(
     passwordInputByUser,
     passwordHash,
